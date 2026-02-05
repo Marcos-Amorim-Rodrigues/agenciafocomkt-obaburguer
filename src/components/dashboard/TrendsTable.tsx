@@ -1,9 +1,12 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { CampaignTrend, formatCurrency, formatNumber } from '@/lib/csvParser';
+import { GoogleAdsCampaignTrend } from '@/lib/googleAdsParser';
 import { cn } from '@/lib/utils';
 
+type TrendData = CampaignTrend | GoogleAdsCampaignTrend;
+
 interface TrendsTableProps {
-  trends: CampaignTrend[];
+  trends: TrendData[];
 }
 
 function TrendIndicator({ current, previous }: { current: number; previous: number }) {
