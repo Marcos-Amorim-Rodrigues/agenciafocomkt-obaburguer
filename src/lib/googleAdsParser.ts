@@ -44,31 +44,61 @@ export function parseGoogleAdsCSV(csvText: string): GoogleAdsData[] {
   const lines = csvText.split('\n').filter(line => line.trim());
   const data: GoogleAdsData[] = [];
 
-  // Header starts at line 13 (index 12), data starts at line 14 (index 13)
-  // Skip first 13 lines (0-12), start processing from index 13
-  for (let i = 13; i < lines.length; i++) {
+  // CSV structure from Google Ads export:
+  // Lines 0-11: metadata (skip)
+  // Line 12: "Rows" section header (skip)
+  // Line 13: Column headers: Day, Keyword status, Keyword, Match type, Campaign, Ad group, Status, Status reasons, Currency code, Max. CPC, Draft change, Clicks, Impr., Cost, All conv.
+  // Line 14+: Data rows
+  
+  // Find the "Rows" section and start parsing from there
+  let dataStartIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith('Rows')) {
+      dataStartIndex = i + 2; // Skip "Rows" line and header line
+      break;
+    }
+  }
+
+  if (dataStartIndex === -1) {
+    console.warn('Could not find "Rows" section in Google Ads CSV');
+    return data;
+  }
+
+  for (let i = dataStartIndex; i < lines.length; i++) {
     const fields = parseCSVLine(lines[i]);
 
-    if (fields.length >= 9) {
-      const entry: GoogleAdsData = {
-        accountName: fields[0] || '',
-        date: fields[1] || '',
-        campaignName: fields[2] || '',
-        keyword: fields[3] || '',
-        spend: parseNumber(fields[4]),
-        conversions: parseNumber(fields[5]),
-        costPerConversion: parseNumber(fields[6]),
-        impressions: parseNumber(fields[7]),
-        clicks: parseNumber(fields[8]),
-      };
+    // CSV columns: Day(0), Keyword status(1), Keyword(2), Match type(3), Campaign(4), 
+    // Ad group(5), Status(6), Status reasons(7), Currency code(8), Max. CPC(9), 
+    // Draft change(10), Clicks(11), Impr.(12), Cost(13), All conv.(14)
+    if (fields.length >= 15) {
+      const day = fields[0] || '';
+      const keyword = fields[2] || '';
+      const campaignName = fields[4] || '';
+      const clicks = parseNumber(fields[11]);
+      const impressions = parseNumber(fields[12]);
+      const spend = parseNumber(fields[13]);
+      const conversions = parseNumber(fields[14]);
 
-      // Only include rows with actual campaign data
-      if (entry.campaignName || entry.spend > 0 || entry.impressions > 0) {
+      // Only include rows with actual data (has a valid date)
+      if (day && day.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const entry: GoogleAdsData = {
+          accountName: 'AmorSaúde Montes Claros',
+          date: day,
+          campaignName,
+          keyword,
+          spend,
+          conversions,
+          costPerConversion: conversions > 0 ? spend / conversions : 0,
+          impressions,
+          clicks,
+        };
+
         data.push(entry);
       }
     }
   }
 
+  console.log(`Parsed ${data.length} Google Ads rows`);
   return data;
 }
 
