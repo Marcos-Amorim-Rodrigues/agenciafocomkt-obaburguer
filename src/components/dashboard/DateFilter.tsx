@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { CalendarIcon } from 'lucide-react';
-import { format, startOfDay, endOfDay, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DateRange as DayPickerDateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
@@ -30,13 +30,13 @@ export function DateFilter({ dateRange, onDateRangeChange, availableDateRange }:
   ];
 
   const handlePreset = (days: number) => {
-    // Define "ontem" como a data final (to)
-    const ontem = subDays(new Date(), 1);
-    const to = endOfDay(ontem);
+    // Use the max available date as reference instead of today
+    const to = availableDateRange?.max ? new Date(availableDateRange.max) : new Date();
+    to.setHours(23, 59, 59, 999);
     
-    // Calcula a data inicial (from) baseada em ontem
-    // Ex: se ontem é 04, 7 dias atrás incluindo ontem é dia 29
-    const from = startOfDay(subDays(to, days - 1));
+    const from = new Date(to);
+    from.setDate(to.getDate() - (days - 1)); // -1 because we want to include "to" day
+    from.setHours(0, 0, 0, 0);
     
     const newRange = { from, to };
     setSelectedRange(newRange);
@@ -46,10 +46,7 @@ export function DateFilter({ dateRange, onDateRangeChange, availableDateRange }:
   const handleSelect = (range: DayPickerDateRange | undefined) => {
     setSelectedRange(range);
     if (range?.from && range?.to) {
-      onDateRangeChange({ 
-        from: startOfDay(range.from), 
-        to: endOfDay(range.to) 
-      });
+      onDateRangeChange({ from: range.from, to: range.to });
       setIsOpen(false);
     }
   };
@@ -96,12 +93,8 @@ export function DateFilter({ dateRange, onDateRangeChange, availableDateRange }:
             onSelect={handleSelect}
             numberOfMonths={2}
             disabled={(date) => {
-              // Bloqueia datas futuras a partir de hoje (permitindo no máximo até ontem)
-              const hoje = startOfDay(new Date());
-              if (availableDateRange) {
-                return date < startOfDay(availableDateRange.min) || date >= hoje;
-              }
-              return date >= hoje;
+              if (!availableDateRange) return false;
+              return date < availableDateRange.min || date > availableDateRange.max;
             }}
             locale={ptBR}
             className="pointer-events-auto"
