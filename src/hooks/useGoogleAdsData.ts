@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { startOfDay, endOfDay, subDays } from 'date-fns';
 import {
   parseGoogleAdsCSV,
   GoogleAdsData,
@@ -27,6 +28,13 @@ export interface GoogleAdsDashboardMetrics {
   cpc: number;
 }
 
+// Função para garantir que "2026-02-04" vire 04/02 no horário LOCAL, ignorando o UTC
+const toLocalDate = (dateInput: string | Date) => {
+  if (dateInput instanceof Date) return dateInput;
+  const [year, month, day] = dateInput.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 export function useGoogleAdsData() {
   const [rawData, setRawData] = useState<GoogleAdsData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,26 +49,24 @@ export function useGoogleAdsData() {
         if (!response.ok) throw new Error('Failed to fetch data');
         const text = await response.text();
         const parsed = parseGoogleAdsCSV(text);
-        setRawData(parsed);
+
+        // Tratamento de data na entrada para evitar inconsistências de fuso
+        const normalizedData = parsed.map(item => ({
+          ...item,
+          date: toLocalDate(item.date)
+        }));
+
+        setRawData(normalizedData);
         
-        // Set initial date range based on data
-        if (parsed.length > 0) {
-          const dates = parsed
-            .map(d => new Date(d.date))
-            .filter(d => !isNaN(d.getTime()))
-            .sort((a, b) => a.getTime() - b.getTime());
+        if (normalizedData.length > 0) {
+          // Padrão D-1: Ontem
+          const to = endOfDay(subDays(new Date(), 1));
           
-          if (dates.length > 0) {
-            const maxDate = dates[dates.length - 1];
-            const from = new Date(maxDate);
-            from.setDate(maxDate.getDate() - 29); // Last 30 days
-            from.setHours(0, 0, 0, 0);
-            
-            const to = new Date(maxDate);
-            to.setHours(23, 59, 59, 999);
-            
-            setDateRange({ from, to });
-          }
+          // Padrão de 7 dias terminando ontem (Ex: 29/01 a 04/02)
+          // Usamos 7 dias aqui para garantir que o 'from' seja D-7 (29/01 se hoje é 05/02)
+          const from = startOfDay(subDays(to, 7));
+          
+          setDateRange({ from, to });
         }
         
         setError(null);
@@ -95,7 +101,7 @@ export function useGoogleAdsData() {
     if (rawData.length === 0) return null;
 
     const dates = rawData
-      .map(d => new Date(d.date))
+      .map(d => toLocalDate(d.date))
       .filter(d => !isNaN(d.getTime()))
       .sort((a, b) => a.getTime() - b.getTime());
 
