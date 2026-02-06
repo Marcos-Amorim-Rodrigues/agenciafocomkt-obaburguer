@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { startOfDay, endOfDay, subDays } from 'date-fns';
 import {
   parseGoogleAdsCSV,
   GoogleAdsData,
@@ -27,6 +28,13 @@ export interface GoogleAdsDashboardMetrics {
   cpc: number;
 }
 
+// Função para garantir leitura local da data
+const toLocalDate = (dateInput: string | Date) => {
+  if (dateInput instanceof Date) return dateInput;
+  const [year, month, day] = dateInput.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 export function useGoogleAdsData() {
   const [rawData, setRawData] = useState<GoogleAdsData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,26 +49,22 @@ export function useGoogleAdsData() {
         if (!response.ok) throw new Error('Failed to fetch data');
         const text = await response.text();
         const parsed = parseGoogleAdsCSV(text);
-        setRawData(parsed);
+
+        // Normalização para evitar o bug de -1 dia no fuso brasileiro
+        const normalizedData = parsed.map(item => ({
+          ...item,
+          date: toLocalDate(item.date)
+        }));
+
+        setRawData(normalizedData);
         
-        // Set initial date range based on data
-        if (parsed.length > 0) {
-          const dates = parsed
-            .map(d => new Date(d.date))
-            .filter(d => !isNaN(d.getTime()))
-            .sort((a, b) => a.getTime() - b.getTime());
+        if (normalizedData.length > 0) {
+          // Ontem como limite final
+          const to = endOfDay(subDays(new Date(), 1));
+          // 7 dias terminando em ontem (D-7 a D-1)
+          const from = startOfDay(subDays(to, 7));
           
-          if (dates.length > 0) {
-            const maxDate = dates[dates.length - 1];
-            const from = new Date(maxDate);
-            from.setDate(maxDate.getDate() - 29); // Last 30 days
-            from.setHours(0, 0, 0, 0);
-            
-            const to = new Date(maxDate);
-            to.setHours(23, 59, 59, 999);
-            
-            setDateRange({ from, to });
-          }
+          setDateRange({ from, to });
         }
         
         setError(null);
@@ -79,7 +83,14 @@ export function useGoogleAdsData() {
   }, [rawData, dateRange]);
 
   const metrics: GoogleAdsDashboardMetrics = useMemo(() => {
-    return aggregateGoogleAdsMetrics(filteredData);
+    const agg = aggregateGoogleAdsMetrics(filteredData);
+    return {
+      ...agg,
+      avgCPA: Number(agg.avgCPA.toFixed(2)),
+      ctr: Number(agg.ctr.toFixed(2)),
+      cpc: Number(agg.cpc.toFixed(2)),
+      totalSpend: Number(agg.totalSpend.toFixed(2)),
+    };
   }, [filteredData]);
 
   const topKeywords: KeywordPerformance[] = useMemo(() => {
@@ -95,7 +106,7 @@ export function useGoogleAdsData() {
     if (rawData.length === 0) return null;
 
     const dates = rawData
-      .map(d => new Date(d.date))
+      .map(d => toLocalDate(d.date))
       .filter(d => !isNaN(d.getTime()))
       .sort((a, b) => a.getTime() - b.getTime());
 
