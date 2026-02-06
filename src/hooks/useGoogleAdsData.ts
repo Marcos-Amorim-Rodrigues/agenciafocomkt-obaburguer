@@ -28,7 +28,7 @@ export interface GoogleAdsDashboardMetrics {
   cpc: number;
 }
 
-// Função para garantir leitura local da data
+// Função para garantir que "2026-02-04" vire 04/02 no horário LOCAL, ignorando o UTC
 const toLocalDate = (dateInput: string | Date) => {
   if (dateInput instanceof Date) return dateInput;
   const [year, month, day] = dateInput.split('-').map(Number);
@@ -50,7 +50,7 @@ export function useGoogleAdsData() {
         const text = await response.text();
         const parsed = parseGoogleAdsCSV(text);
 
-        // Normalização para evitar o bug de -1 dia no fuso brasileiro
+        // 1. Normalização das datas para o fuso local
         const normalizedData = parsed.map(item => ({
           ...item,
           date: toLocalDate(item.date)
@@ -58,11 +58,13 @@ export function useGoogleAdsData() {
 
         setRawData(normalizedData);
         
+        // 2. Ajuste do Filtro Inicial: Forçamos D-1 (Ontem) como referência
         if (normalizedData.length > 0) {
-          // Ontem como limite final
+          // Ontem (04/02)
           const to = endOfDay(subDays(new Date(), 1));
-          // 7 dias terminando em ontem (D-7 a D-1)
-          const from = startOfDay(subDays(to, 7));
+          
+          // Para pegar 7 dias exatos (29/01 a 04/02), voltamos 6 dias em relação a ontem
+          const from = startOfDay(subDays(to, 6));
           
           setDateRange({ from, to });
         }
@@ -84,6 +86,7 @@ export function useGoogleAdsData() {
 
   const metrics: GoogleAdsDashboardMetrics = useMemo(() => {
     const agg = aggregateGoogleAdsMetrics(filteredData);
+    // Garantimos que os Big Numbers retornem números limpos
     return {
       ...agg,
       avgCPA: Number(agg.avgCPA.toFixed(2)),
