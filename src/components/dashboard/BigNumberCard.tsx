@@ -66,7 +66,7 @@ export function BigNumberCard({
 
       <p className="metric-label mb-2 truncate">{title}</p>
       <p className={cn(
-        "text-2xl md:text-3xl font-bold tracking-tight break-words",
+        "text-2xl md:text-2xl font-bold tracking-tight break-words",
         variant === 'primary' ? 'text-primary' : 'text-foreground'
       )}>
         {value}
