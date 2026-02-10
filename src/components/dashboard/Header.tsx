@@ -18,8 +18,8 @@ export function Header({ platform, onPlatformChange }: HeaderProps) {
         <div className="h-8 w-px bg-border/50" />
         <div>
           <h1 className="text-xl font-semibold tracking-tight">
-            <span className="text-primary">AmorSaúde</span>{' '}
-            <span className="text-foreground/80">Montes Claros</span>
+            <span className="text-primary">Oba</span>{' '}
+            <span className="text-foreground/80">Burguer</span>
           </h1>
           <p className="text-xs text-muted-foreground">
             Dashboard de Métricas {platform === 'meta' ? 'Meta Ads' : 'Google Ads'}
